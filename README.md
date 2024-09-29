@@ -25,4 +25,6 @@
 7. **Run migrations:**
    ```bash
    ./vendor/bin/sail artisan migrate
-
+8. **Running Tests:**
+    ```bash
+    ./vendor/bin/sail test
