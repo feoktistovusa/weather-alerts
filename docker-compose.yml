@@ -64,7 +64,7 @@ services:
             retries: 3
             timeout: 5s
     scheduler:
-        image: laravel.test
+        image: 'sail-8.3/app'
         command: |
             sh -c "while true; do
               php /var/www/html/artisan schedule:run;

@@ -6,7 +6,7 @@ use Illuminate\Mail\Mailable;
 
 class WeatherAlertMail extends Mailable
 {
-    public $alertData;
+    public array $alertData;
 
     public function __construct(array $alertData)
     {

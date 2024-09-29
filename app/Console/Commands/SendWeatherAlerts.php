@@ -6,6 +6,7 @@ use App\Mail\WeatherAlertMail;
 use App\Models\Subscriber;
 use App\Services\WeatherService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class SendWeatherAlerts extends Command
@@ -13,51 +14,91 @@ class SendWeatherAlerts extends Command
     protected $signature = 'weather:send-alerts';
     protected $description = 'Send weather alerts to subscribers';
 
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
     public function handle(WeatherService $weatherService)
     {
         $subscribers = Subscriber::all();
 
-        foreach ($subscribers as $subscriber) {
-            $city = $subscriber->city;
-            $weather = $weatherService->getCurrentWeather($city);
-
-            $alertMessage = $this->checkForAlerts($weather);
-
-            if ($alertMessage) {
-                $alertData = [
-                    'city'    => $city,
-                    'message' => $alertMessage,
-                ];
-
-                Mail::to($subscriber->email)->send(new WeatherAlertMail($alertData));
-            }
+        if ($subscribers->isEmpty()) {
+            $this->info('No subscribers found.');
+            return self::SUCCESS;
         }
 
-        return Command::SUCCESS;
+        foreach ($subscribers as $subscriber) {
+            $this->processSubscriber($subscriber, $weatherService);
+        }
+
+        return self::SUCCESS;
     }
 
-    private function checkForAlerts(array $weather): ?string
+    private function processSubscriber(Subscriber $subscriber, WeatherService $weatherService): void
+    {
+        $email = $subscriber->email;
+        $city  = $subscriber->city;
+
+        $this->info("Processing subscriber: {$email}");
+        $this->info("Fetching weather for city: {$city}");
+
+        try {
+            $weather      = $weatherService->getCurrentWeather($city);
+            $alertMessage = $this->generateAlertMessage($weather);
+
+            if ($alertMessage) {
+                $this->sendAlert($email, $city, $alertMessage);
+                $this->info("Email sent to: {$email}");
+            } else {
+                $this->info("No alerts for {$email} in {$city}");
+            }
+        } catch (\Exception $e) {
+            $this->error("Error processing {$email}: " . $e->getMessage());
+            Log::error("Error processing subscriber", [
+                'email'     => $email,
+                'city'      => $city,
+                'exception' => $e,
+            ]);
+        }
+    }
+
+    private function generateAlertMessage(array $weather): ?string
     {
         $alerts = [];
 
-        // Check for high precipitation
-        if (isset($weather['rain']) && $weather['rain']['1h'] > 10) {
+        if ($this->hasHighPrecipitation($weather)) {
             $alerts[] = 'High precipitation expected.';
         }
 
-        // Check for harmful UV rays
-        if (isset($weather['coord'])) {
-            $uvData = app(WeatherService::class)->getUVIndex($weather['coord']['lat'], $weather['coord']['lon']);
-            if ($uvData['value'] > 6) {
-                $alerts[] = 'High UV index detected.';
-            }
+        if ($this->hasHarmfulUVIndex($weather)) {
+            $alerts[] = 'High UV index detected.';
         }
 
         return $alerts ? implode(' ', $alerts) : null;
+    }
+
+    private function hasHighPrecipitation(array $weather): bool
+    {
+        return isset($weather['rain']['1h']) && $weather['rain']['1h'] > 10;
+    }
+
+    private function hasHarmfulUVIndex(array $weather): bool
+    {
+        if (!isset($weather['coord']['lat'], $weather['coord']['lon'])) {
+            return false;
+        }
+
+        $uvData = app(WeatherService::class)->getUVIndex(
+            $weather['coord']['lat'],
+            $weather['coord']['lon']
+        );
+
+        return isset($uvData['value']) && $uvData['value'] > 6;
+    }
+
+    private function sendAlert(string $email, string $city, string $message): void
+    {
+        $alertData = [
+            'city'    => $city,
+            'message' => $message,
+        ];
+
+        Mail::to($email)->send(new WeatherAlertMail($alertData));
     }
 }
