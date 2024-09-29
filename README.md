@@ -31,18 +31,3 @@ Update env variables in .env: `OPENWEATHER_API_KEY, MAIL_HOST, MAIL_USERNAME, MA
 8. **Running Tests:**
     ```bash
     ./vendor/bin/sail test
-9. **Add subscriber to the database:**
-    ```bash
-   ./vendor/bin/sail artisan tinker
-    
-   App\Models\Subscriber::create([
-    'email' => 'test@example.com',
-    'city'  => 'London',
-   ]);
- 
-   App\Models\Subscriber::all();
-10. **Manually run the command to check alerts:**
-   ```bash
-   ./vendor/bin/sail artisan weather:send-alerts -v
-
-If there is any alert for subscriber location the email will be sent. Use any sandbox like Mailtrap to test it locally and specify the env variables in .env: OPENWEATHER_API_KEY, MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD. 

@@ -64,16 +64,33 @@ services:
             retries: 3
             timeout: 5s
     scheduler:
+        build:
+            context: './vendor/laravel/sail/runtimes/8.3'
+            dockerfile: Dockerfile
+            args:
+                INSTALL_PGSQL: 'false'
+                INSTALL_BCMATH: 'true'
+                INSTALL_PDO_MYSQL: 'true'
+                WWWGROUP: '${WWWGROUP}'
         image: 'sail-8.3/app'
-        command: |
-            sh -c "while true; do
-              php /var/www/html/artisan schedule:run;
-              sleep 60;
-            done"
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+            IGNITION_LOCAL_SITES_PATH: '${PWD}'
+        restart: unless-stopped
         volumes:
-            - ./:/var/www/html
+            - '.:/var/www/html'
+        networks:
+            - sail
         depends_on:
             - laravel.test
+        command: >
+            sh -c "while true; do
+              php /var/www/html/artisan schedule:run --verbose --no-interaction;
+              sleep 60;
+            done"
 networks:
     sail:
         driver: bridge
